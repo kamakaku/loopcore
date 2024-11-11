@@ -1,0 +1,124 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*')
+        && request.resource.size < 5 * 1024 * 1024; // 5MB
+    }
+
+    function isTeamMember(teamId) {
+      return isAuthenticated() && exists(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid));
+    }
+
+    function isProjectMember(projectId) {
+      return isAuthenticated() && exists(/databases/$(database)/documents/projects/$(projectId)/members/$(request.auth.uid));
+    }
+
+    // Avatar uploads
+    match /avatars/{userId}/{filename} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && (
+        isOwner(userId) &&
+        request.resource.contentType.matches('image/.*') &&
+        request.resource.size < 5 * 1024 * 1024
+      );
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+
+    // Screenshots folder
+    match /screenshots/{userId}/{filename} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && (
+        isOwner(userId) &&
+        request.resource.size < 10 * 1024 * 1024 && // 10MB max file size
+        request.resource.contentType.matches('image/.*') // Only allow images
+      );
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+
+    // Figma folder
+    match /figma/{fileKey}/{filename} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && (
+        request.resource.size < 10 * 1024 * 1024 && // 10MB max file size
+        request.resource.contentType.matches('image/.*') // Only allow images
+      );
+      allow delete: if isAuthenticated() && (
+        resource.metadata.uploadedBy == request.auth.uid
+      );
+    }
+
+    // Loops folder
+    match /loops/{userId}/{filename} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && (
+        isOwner(userId) &&
+        request.resource.size < 10 * 1024 * 1024 && // 10MB max file size
+        (
+          request.resource.contentType.matches('image/.*') || // Allow images
+          request.resource.contentType == 'application/pdf'   // Allow PDFs
+        )
+      );
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+
+    // Team files
+    match /teams/{teamId}/{filename} {
+      allow read: if isAuthenticated() && isTeamMember(teamId);
+      allow create, update: if isAuthenticated() && isTeamMember(teamId) && (
+        request.resource.size < 20 * 1024 * 1024 && // 20MB max file size
+        (
+          request.resource.contentType.matches('image/.*') ||
+          request.resource.contentType == 'application/pdf' ||
+          request.resource.contentType == 'application/msword' ||
+          request.resource.contentType == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+      );
+      allow delete: if isAuthenticated() && isTeamMember(teamId) && (
+        resource.metadata.uploadedBy == request.auth.uid
+      );
+    }
+
+    // Project files
+    match /projects/{projectId}/{filename} {
+      allow read: if isAuthenticated() && isProjectMember(projectId);
+      allow create, update: if isAuthenticated() && isProjectMember(projectId) && (
+        request.resource.size < 20 * 1024 * 1024 && // 20MB max file size
+        (
+          request.resource.contentType.matches('image/.*') ||
+          request.resource.contentType == 'application/pdf' ||
+          request.resource.contentType == 'application/msword' ||
+          request.resource.contentType == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+      );
+      allow delete: if isAuthenticated() && isProjectMember(projectId) && (
+        resource.metadata.uploadedBy == request.auth.uid
+      );
+    }
+
+    // Comments attachments
+    match /comments/{userId}/{filename} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isOwner(userId) && (
+        request.resource.size < 10 * 1024 * 1024 && // 10MB max file size
+        request.resource.contentType.matches('image/.*') // Only allow images
+      );
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+
+    // Default rule - deny all other access
+    match /{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+  }
+}

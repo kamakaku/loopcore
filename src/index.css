@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base styles */
+:root {
+  --page-transition-duration: 200ms;
+}
+
+html {
+  @apply antialiased;
+}
+
+body {
+  @apply m-0 p-0 min-h-screen bg-gray-50;
+}
+
+#root {
+  @apply min-h-screen isolate;
+}
+
+/* Prevent layout shifts */
+* {
+  @apply box-border;
+}
+
+/* Smooth transitions */
+.page-transition {
+  @apply transition-all duration-200 ease-out;
+}
+
+/* Loading animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Fade in animation */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Route transitions */
+.route-enter {
+  @apply opacity-0;
+}
+
+.route-enter-active {
+  @apply opacity-100 transition-opacity;
+  transition-duration: var(--page-transition-duration);
+}
+
+.route-exit {
+  @apply opacity-100;
+}
+
+.route-exit-active {
+  @apply opacity-0 transition-opacity;
+  transition-duration: var(--page-transition-duration);
+}
+
+/* Rest of your existing styles... */
