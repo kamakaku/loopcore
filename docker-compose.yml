@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  meine-anwendung:
+    image: mein-image:latest
+    ports:
+      - '3000:3000'
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.meine-anwendung.rule=Host(`meine-anwendung.example.com`)'
+      - 'traefik.http.routers.meine-anwendung.entrypoints=websecure'
+      - 'traefik.http.routers.meine-anwendung.tls.certresolver=letsencrypt'
