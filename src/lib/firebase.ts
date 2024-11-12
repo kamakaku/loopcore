@@ -1,6 +1,4 @@
-import { initializeApp } from 'firebase/app';
 import { 
-  getAuth, 
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
@@ -8,8 +6,8 @@ import {
   signOut as firebaseSignOut,
   User
 } from 'firebase/auth';
+
 import { 
-  getFirestore,
   collection,
   doc,
   setDoc,
@@ -24,50 +22,42 @@ import {
   where,
   arrayUnion,
   arrayRemove,
-  writeBatch,
-  enableIndexedDbPersistence
+  writeBatch
 } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
-import { getFunctions } from 'firebase/functions';
 
-// Get Firebase config from environment variable
-const firebaseConfig = JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG || '{}');
-
-if (!firebaseConfig.apiKey) {
-  throw new Error('Firebase configuration is missing or invalid');
-}
-
-// Initialize Firebase only once
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
-const functions = getFunctions(app);
-
-// Enable offline persistence
-if (process.env.NODE_ENV === 'production') {
-  enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
-    } else if (err.code === 'unimplemented') {
-      console.warn('The current browser does not support persistence.');
-    }
-  });
-}
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { app, auth, db, storage, functions } from './firebase/config';
 
 // Auth functions
-export const signUp = async (email: string, password: string, name: string) => {
-  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-  await updateProfile(userCredential.user, { displayName: name });
-  
-  await setDoc(doc(db, 'users', userCredential.user.uid), {
-    name,
-    email,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  });
-  
-  return userCredential.user;
+export const signUp = async (email: string, password: string, name: string): Promise<User> => {
+  try {
+    // Create the user account
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    
+    // Update the user's profile with their name
+    await updateProfile(userCredential.user, { 
+      displayName: name 
+    });
+    
+    // Create the user document in Firestore
+    await setDoc(doc(db, 'users', userCredential.user.uid), {
+      name,
+      email,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      subscription: {
+        planId: 'free',
+        status: 'active',
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        cancelAtPeriodEnd: false
+      }
+    });
+    
+    return userCredential.user;
+  } catch (error: any) {
+    console.error('Error during sign up:', error);
+    throw error;
+  }
 };
 
 export const signIn = async (email: string, password: string) => {
@@ -111,6 +101,14 @@ export {
   arrayUnion,
   arrayRemove,
   writeBatch
+};
+
+// Export Storage functions
+export {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject
 };
 
 // Export all functions from their respective modules
