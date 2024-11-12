@@ -27,6 +27,7 @@ import {
 
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { app, auth, db, storage } from './config';
+import { goOnline, goOffline, isNetworkAvailable } from './db';
 
 // Auth functions
 export const signUp = async (email: string, password: string, name: string): Promise<User> => {
@@ -74,6 +75,9 @@ export const resetPassword = async (email: string) => {
 
 // Export initialized services
 export { app, auth, db, storage };
+
+// Export network management functions
+export { goOnline, goOffline, isNetworkAvailable };
 
 // Export types
 export type { User };
