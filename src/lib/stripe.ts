@@ -60,7 +60,7 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
   if (!auth.currentUser) throw new Error('Authentication required');
 
   try {
-    const response = await fetch('/.netlify/functions/create-checkout-session', {
+    const response = await fetch('/netlify/functions/create-checkout-session', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
