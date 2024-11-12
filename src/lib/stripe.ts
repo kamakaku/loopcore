@@ -63,7 +63,7 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
   }
 
   try {
-    const response = await fetch('/.netlify/functions/create-checkout-session', {
+    const response = await fetch('/netlify/functions/create-checkout-session', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
