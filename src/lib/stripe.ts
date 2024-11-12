@@ -1,3 +1,4 @@
+// src/lib/stripe.ts
 import { loadStripe } from '@stripe/stripe-js';
 import { auth } from './firebase';
 
@@ -97,11 +98,10 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
 
   try {
     const stripe = await stripePromise;
-    
     if (!stripe) {
       throw new Error('Failed to initialize Stripe');
     }
-
+    
     const response = await fetch(`${import.meta.env.VITE_API_URL}/create-checkout-session`, {
       method: 'POST',
       headers: {
