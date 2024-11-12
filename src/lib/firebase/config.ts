@@ -24,8 +24,7 @@ const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager()
   }),
-  experimentalAutoDetectLongPolling: true,
-  experimentalForceLongPolling: true // Add this for better performance with Coolify/Docker
+  experimentalForceLongPolling: true // Use long polling for better performance in containerized environments
 });
 
 const storage = getStorage(app);
