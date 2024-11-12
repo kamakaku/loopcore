@@ -1,41 +1,61 @@
 import { Handler } from '@netlify/functions';
 import Stripe from 'stripe';
 
+// Initialize Stripe with the secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
 });
 
 export const handler: Handler = async (event) => {
+  // Only allow POST requests
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return { 
+      statusCode: 405, 
+      body: JSON.stringify({ error: 'Method Not Allowed' })
+    };
   }
 
   try {
     const { planId, additionalTeamMembers = 0, userId } = JSON.parse(event.body || '{}');
 
-    if (!planId || !userId) {
+    // Validate required parameters
+    if (!planId) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Missing required parameters' })
+        body: JSON.stringify({ error: 'Plan ID is required' })
       };
     }
 
-    // Create the session with the correct price ID
+    if (!userId) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'User ID is required' })
+      };
+    }
+
+    // Create line items array
+    const lineItems = [
+      {
+        price: planId,
+        quantity: 1,
+      }
+    ];
+
+    // Add additional team members if any
+    if (additionalTeamMembers > 0 && process.env.VITE_STRIPE_PRICE_ADDITIONAL_MEMBER) {
+      lineItems.push({
+        price: process.env.VITE_STRIPE_PRICE_ADDITIONAL_MEMBER,
+        quantity: additionalTeamMembers,
+      });
+    }
+
+    // Create the checkout session
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
-      line_items: [
-        {
-          price: planId,
-          quantity: 1,
-        },
-        ...(additionalTeamMembers > 0 ? [{
-          price: process.env.VITE_STRIPE_PRICE_ADDITIONAL_MEMBER,
-          quantity: additionalTeamMembers,
-        }] : []),
-      ],
-      success_url: `${process.env.URL}/dashboard?success=true`,
-      cancel_url: `${process.env.URL}/plans?canceled=true`,
+      line_items: lineItems,
+      success_url: `${process.env.URL || event.headers.origin}/dashboard?success=true`,
+      cancel_url: `${process.env.URL || event.headers.origin}/plans?canceled=true`,
       metadata: {
         userId,
         planId,
@@ -48,7 +68,10 @@ export const handler: Handler = async (event) => {
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ sessionId: session.id }),
+      body: JSON.stringify({ 
+        sessionId: session.id,
+        publishableKey: process.env.VITE_STRIPE_PUBLISHABLE_KEY
+      }),
     };
   } catch (err) {
     console.error('Error creating checkout session:', err);

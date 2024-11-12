@@ -1,11 +1,12 @@
 import { loadStripe } from '@stripe/stripe-js';
 import { auth } from './firebase';
 
+// Initialize Stripe with publishable key
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 export const PLANS = {
   FREE: {
-    id: 'free',
+    id: import.meta.env.VITE_STRIPE_PRICE_FREE,
     name: 'Free',
     price: 0,
     limits: {
@@ -57,10 +58,12 @@ export const PLANS = {
 } as const;
 
 export async function createCheckoutSession(planId: string, additionalTeamMembers: number = 0) {
-  if (!auth.currentUser) throw new Error('Authentication required');
+  if (!auth.currentUser) {
+    throw new Error('Authentication required');
+  }
 
   try {
-    const response = await fetch('/netlify/functions/create-checkout-session', {
+    const response = await fetch('/.netlify/functions/create-checkout-session', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -78,15 +81,14 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
       throw new Error(errorData.error || 'Failed to create checkout session');
     }
 
-    const { sessionId } = await response.json();
-    const stripe = await stripePromise;
+    const { sessionId, publishableKey } = await response.json();
     
+    const stripe = await loadStripe(publishableKey);
     if (!stripe) {
-      throw new Error('Stripe failed to initialize');
+      throw new Error('Failed to initialize Stripe');
     }
 
     const { error } = await stripe.redirectToCheckout({ sessionId });
-    
     if (error) {
       throw error;
     }
