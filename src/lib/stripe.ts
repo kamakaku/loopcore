@@ -1,14 +1,7 @@
 import { loadStripe } from '@stripe/stripe-js';
-import { auth } from './firebase';
-
-// Ensure we have a valid publishable key
-const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-if (!publishableKey) {
-  throw new Error('Stripe publishable key is required');
-}
 
 // Initialize Stripe with publishable key
-const stripePromise = loadStripe(publishableKey);
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
 export const PLANS = {
   FREE: {
@@ -71,6 +64,11 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
   }
 
   try {
+    const stripe = await stripePromise;
+    if (!stripe) {
+      throw new Error('Stripe failed to initialize');
+    }
+
     const response = await fetch(`${API_URL}/create-checkout-session`, {
       method: 'POST',
       headers: {
@@ -90,13 +88,8 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
     }
 
     const { sessionId } = await response.json();
-    const stripe = await stripePromise;
-    
-    if (!stripe) {
-      throw new Error('Failed to initialize Stripe');
-    }
-
     const { error } = await stripe.redirectToCheckout({ sessionId });
+    
     if (error) {
       throw error;
     }
