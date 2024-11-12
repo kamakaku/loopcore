@@ -1,8 +1,7 @@
-import { auth } from './firebase';
 import { loadStripe } from '@stripe/stripe-js';
 
 // Initialize Stripe with publishable key
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
 export const PLANS = {
   FREE: {
@@ -68,13 +67,13 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
     const response = await fetch(`${API_URL}/create-checkout-session`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'x-customer-email': auth.currentUser.email || ''
       },
       body: JSON.stringify({
         planId,
         additionalTeamMembers,
-        userId: auth.currentUser.uid,
-        customerEmail: auth.currentUser.email
+        userId: auth.currentUser.uid
       })
     });
 
@@ -83,9 +82,9 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
       throw new Error(errorData.error || 'Failed to create checkout session');
     }
 
-    const { sessionId, publishableKey } = await response.json();
+    const { sessionId } = await response.json();
+    const stripe = await stripePromise;
     
-    const stripe = await loadStripe(publishableKey);
     if (!stripe) {
       throw new Error('Failed to initialize Stripe');
     }
@@ -96,10 +95,7 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
     }
   } catch (error) {
     console.error('Error creating checkout session:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to create checkout session: ${error.message}`);
-    }
-    throw new Error('Failed to create checkout session');
+    throw error;
   }
 }
 
@@ -125,10 +121,7 @@ export async function cancelSubscription() {
     }
   } catch (error) {
     console.error('Error canceling subscription:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to cancel subscription: ${error.message}`);
-    }
-    throw new Error('Failed to cancel subscription');
+    throw error;
   }
 }
 
@@ -154,9 +147,6 @@ export async function reactivateSubscription() {
     }
   } catch (error) {
     console.error('Error reactivating subscription:', error);
-    if (error instanceof Error) {
-      throw new Error(`Failed to reactivate subscription: ${error.message}`);
-    }
-    throw new Error('Failed to reactivate subscription');
+    throw error;
   }
 }
