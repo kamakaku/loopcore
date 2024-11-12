@@ -4,15 +4,16 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: true, // Needed for Docker
-    port: 3001,
+    host: '0.0.0.0', // Required for Docker
+    port: 3000,
     strictPort: true,
     watch: {
-      usePolling: true // Needed for Docker on some systems
+      usePolling: true // Required for Docker on some systems
     }
   },
   build: {
     outDir: 'dist',
     sourcemap: true
-  }
+  },
+  envPrefix: 'VITE_' // Ensure Vite recognizes our env variables
 });
