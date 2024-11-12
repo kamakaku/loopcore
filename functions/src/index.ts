@@ -82,7 +82,8 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
   const sig = req.headers['stripe-signature'];
 
   if (!sig) {
-    return res.status(400).send('No signature found');
+    res.status(400).send('No signature found');
+    return;
   }
 
   try {
