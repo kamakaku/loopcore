@@ -1,14 +1,19 @@
 import { loadStripe } from '@stripe/stripe-js';
 import { auth } from './firebase';
 
-// Initialize Stripe with publishable key, with proper validation
+// Initialize Stripe with publishable key, with proper validation and error handling
 const stripePromise = (() => {
   const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
   if (!key) {
-    console.error('Stripe publishable key is missing');
+    console.error('Stripe publishable key is missing. Please check your .env file.');
     return null;
   }
-  return loadStripe(key);
+  try {
+    return loadStripe(key);
+  } catch (error) {
+    console.error('Failed to initialize Stripe:', error);
+    return null;
+  }
 })();
 
 export const PLANS = {
@@ -72,7 +77,7 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
   }
 
   if (!stripePromise) {
-    throw new Error('Stripe is not properly initialized. Please check your API key configuration.');
+    throw new Error('Stripe is not properly initialized. Please check your environment configuration.');
   }
 
   try {
