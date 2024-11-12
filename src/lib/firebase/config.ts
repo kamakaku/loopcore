@@ -1,34 +1,34 @@
-import { initializeApp } from '@firebase/app';
-import { getAuth } from '@firebase/auth';
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
 import { 
   getFirestore,
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager
-} from '@firebase/firestore';
-import { getStorage } from '@firebase/storage';
-import { getFunctions } from '@firebase/functions';
+} from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
+import { getFunctions } from 'firebase/functions';
 
-// Get Firebase config from environment variable
+// Initialize Firebase with config
 const firebaseConfig = JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG || '{}');
 
 if (!firebaseConfig.apiKey) {
   throw new Error('Firebase configuration is missing or invalid');
 }
 
-// Initialize Firebase app
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+// Create the Firebase app instance first
+export const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore without persistence settings
-const db = initializeFirestore(app, {
+// Then initialize all services using that app instance
+export const auth = getAuth(app);
+export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager()
   }),
   experimentalAutoDetectLongPolling: true
 });
+export const storage = getStorage(app);
+export const functions = getFunctions(app);
 
-const storage = getStorage(app);
-const functions = getFunctions(app);
-
-export { app, auth, db, storage, functions, firebaseConfig };
+// Export config if needed elsewhere
+export { firebaseConfig };
