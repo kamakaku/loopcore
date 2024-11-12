@@ -1,3 +1,4 @@
+import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
   createUserWithEmailAndPassword,
@@ -37,6 +38,7 @@ if (!firebaseConfig.apiKey) {
 }
 
 // Initialize Firebase only once
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
