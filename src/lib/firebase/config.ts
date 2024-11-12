@@ -1,7 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { 
-  getFirestore, 
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager
@@ -23,8 +22,7 @@ const auth = getAuth(app);
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager()
-  }),
-  experimentalForceLongPolling: true // Use long polling for better performance in containerized environments
+  })
 });
 
 const storage = getStorage(app);
