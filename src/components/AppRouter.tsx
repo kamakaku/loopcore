@@ -12,9 +12,6 @@ export default function AppRouter() {
     return <LoadingScreen />;
   }
 
-  // Check if user has selected a plan
-  const hasSelectedPlan = user?.subscription?.planId !== undefined;
-
   return (
     <Routes>
       {/* Public routes */}
@@ -23,10 +20,10 @@ export default function AppRouter() {
         element={
           !user ? (
             <Navigate to="/auth" replace />
-          ) : hasSelectedPlan ? (
-            <Navigate to="/dashboard" replace />
-          ) : (
+          ) : !user.subscription?.planId ? (
             <Navigate to="/plans" replace />
+          ) : (
+            <Navigate to="/dashboard" replace />
           )
         } 
       />
@@ -34,33 +31,54 @@ export default function AppRouter() {
       <Route 
         path="/auth" 
         element={
-          !user ? (
-            <AuthScreen />
-          ) : hasSelectedPlan ? (
-            <Navigate to="/dashboard" replace />
+          user ? (
+            <Navigate to={user.subscription?.planId ? '/dashboard' : '/plans'} replace />
           ) : (
-            <Navigate to="/plans" replace />
+            <AuthScreen />
           )
         } 
       />
       
       {/* Protected routes */}
-      {user ? (
-        !hasSelectedPlan ? (
-          <>
-            <Route path="/plans" element={<PlanSelector />} />
-            <Route path="*" element={<Navigate to="/plans" replace />} />
-          </>
-        ) : (
-          <>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </>
-        )
-      ) : (
-        // Not authenticated - redirect to auth
-        <Route path="*" element={<Navigate to="/auth" replace />} />
-      )}
+      <Route 
+        path="/plans" 
+        element={
+          !user ? (
+            <Navigate to="/auth" replace />
+          ) : user.subscription?.planId ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <PlanSelector />
+          )
+        } 
+      />
+
+      <Route 
+        path="/dashboard/*" 
+        element={
+          !user ? (
+            <Navigate to="/auth" replace />
+          ) : !user.subscription?.planId ? (
+            <Navigate to="/plans" replace />
+          ) : (
+            <Dashboard />
+          )
+        } 
+      />
+
+      {/* Catch all - redirect to auth if not logged in, or appropriate page if logged in */}
+      <Route 
+        path="*" 
+        element={
+          !user ? (
+            <Navigate to="/auth" replace />
+          ) : !user.subscription?.planId ? (
+            <Navigate to="/plans" replace />
+          ) : (
+            <Navigate to="/dashboard" replace />
+          )
+        } 
+      />
     </Routes>
   );
 }

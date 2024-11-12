@@ -1,4 +1,6 @@
 import { loadStripe } from '@stripe/stripe-js';
+import { httpsCallable, HttpsCallableResult } from 'firebase/functions';
+import { functions } from './firebase';
 import { auth } from './firebase';
 
 // Initialize Stripe with publishable key
@@ -57,31 +59,28 @@ export const PLANS = {
   }
 } as const;
 
+interface CheckoutSessionResponse {
+  sessionId: string;
+  publishableKey: string;
+}
+
 export async function createCheckoutSession(planId: string, additionalTeamMembers: number = 0) {
   if (!auth.currentUser) {
     throw new Error('Authentication required');
   }
 
   try {
-    const response = await fetch('/netlify/functions/create-checkout-session', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-customer-email': auth.currentUser.email || '',
-      },
-      body: JSON.stringify({
-        planId,
-        additionalTeamMembers,
-        userId: auth.currentUser.uid,
-      }),
+    const createCheckoutSessionFn = httpsCallable<
+      { planId: string; additionalTeamMembers: number },
+      CheckoutSessionResponse
+    >(functions, 'createCheckoutSession');
+
+    const result = await createCheckoutSessionFn({
+      planId,
+      additionalTeamMembers
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create checkout session');
-    }
-
-    const { sessionId, publishableKey } = await response.json();
+    const { sessionId, publishableKey } = result.data;
     
     const stripe = await loadStripe(publishableKey);
     if (!stripe) {
@@ -94,6 +93,43 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
     }
   } catch (error) {
     console.error('Error creating checkout session:', error);
-    throw error;
+    if (error instanceof Error) {
+      throw new Error(`Failed to create checkout session: ${error.message}`);
+    }
+    throw new Error('Failed to create checkout session');
+  }
+}
+
+export async function cancelSubscription() {
+  if (!auth.currentUser) {
+    throw new Error('Authentication required');
+  }
+
+  try {
+    const cancelSubscriptionFn = httpsCallable(functions, 'cancelSubscription');
+    await cancelSubscriptionFn();
+  } catch (error) {
+    console.error('Error canceling subscription:', error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to cancel subscription: ${error.message}`);
+    }
+    throw new Error('Failed to cancel subscription');
+  }
+}
+
+export async function reactivateSubscription() {
+  if (!auth.currentUser) {
+    throw new Error('Authentication required');
+  }
+
+  try {
+    const reactivateSubscriptionFn = httpsCallable(functions, 'reactivateSubscription');
+    await reactivateSubscriptionFn();
+  } catch (error) {
+    console.error('Error reactivating subscription:', error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to reactivate subscription: ${error.message}`);
+    }
+    throw new Error('Failed to reactivate subscription');
   }
 }
