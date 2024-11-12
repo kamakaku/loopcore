@@ -9,13 +9,13 @@ import { getStorage } from 'firebase/storage';
 
 // Default Firebase configuration for development
 const defaultConfig = {
-  apiKey: "AIzaSyDHt6qPXF6PiJfBrX-ZS66yP6BMZVrv_eo",
-  authDomain: "loopcore-dev.firebaseapp.com",
-  projectId: "loopcore-dev",
-  storageBucket: "loopcore-dev.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:abcdef1234567890",
-  measurementId: "G-ABCDEF1234"
+  apiKey: "AIzaSyCO4Fq8uTFFhL5lVDiTYIXzwjcS03D1fQE",
+  authDomain: "loopcore-3fc6f.firebaseapp.com",
+  projectId: "loopcore-3fc6f",
+  storageBucket: "loopcore-3fc6f.appspot.com",
+  messagingSenderId: "814296163933",
+  appId: "1:814296163933:web:a0ba05f033343f32d7cfb4",
+  measurementId: "G-J0NPPN8GGB"
 };
 
 // Use environment config if available, otherwise fall back to default
