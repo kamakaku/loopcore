@@ -4,11 +4,8 @@ WORKDIR /app
 
 # Install dependencies
 COPY package*.json ./
-<<<<<<< HEAD
+
 RUN npm isntall
-=======
-RUN npm ci
->>>>>>> 52d314d (New)
 
 # Copy source code
 COPY . .

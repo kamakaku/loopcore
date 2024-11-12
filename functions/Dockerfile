@@ -4,11 +4,8 @@ WORKDIR /app/functions
 
 # Install dependencies
 COPY functions/package*.json ./
-<<<<<<< HEAD
+
 RUN npm install
-=======
-RUN npm ci
->>>>>>> 52d314d (New)
 
 # Copy source code
 COPY functions/ .
