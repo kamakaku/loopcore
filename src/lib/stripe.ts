@@ -1,7 +1,14 @@
 import { loadStripe } from '@stripe/stripe-js';
+import { auth } from './firebase';
+
+// Ensure we have a valid publishable key
+const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+if (!publishableKey) {
+  throw new Error('Stripe publishable key is required');
+}
 
 // Initialize Stripe with publishable key
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+const stripePromise = loadStripe(publishableKey);
 
 export const PLANS = {
   FREE: {
