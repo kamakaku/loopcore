@@ -1,6 +1,5 @@
-import { initializeApp } from 'firebase/app';
+import { auth, db, storage, app } from './config';  // Verwende hier den Pfad zu `config.ts`
 import { 
-  getAuth, 
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
@@ -9,7 +8,6 @@ import {
   User
 } from 'firebase/auth';
 import { 
-  getFirestore,
   collection,
   doc,
   setDoc,
@@ -24,36 +22,8 @@ import {
   where,
   arrayUnion,
   arrayRemove,
-  writeBatch,
-  enableIndexedDbPersistence
+  writeBatch
 } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
-import { getFunctions } from 'firebase/functions';
-
-// Get Firebase config from environment variable
-const firebaseConfig = JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG || '{}');
-
-if (!firebaseConfig.apiKey) {
-  throw new Error('Firebase configuration is missing or invalid');
-}
-
-// Initialize Firebase only once
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
-const functions = getFunctions(app);
-
-// Enable offline persistence
-if (process.env.NODE_ENV === 'production') {
-  enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
-    } else if (err.code === 'unimplemented') {
-      console.warn('The current browser does not support persistence.');
-    }
-  });
-}
 
 // Auth functions
 export const signUp = async (email: string, password: string, name: string) => {
@@ -82,16 +52,13 @@ export const resetPassword = async (email: string) => {
   return sendPasswordResetEmail(auth, email);
 };
 
-// Export initialized services
+// Export initialized services and types
 export { 
   app, 
   auth, 
   db, 
-  storage,
-  functions
+  storage
 };
-
-// Export types
 export type { User };
 
 // Export Firestore types and functions
@@ -112,10 +79,3 @@ export {
   arrayRemove,
   writeBatch
 };
-
-// Export all functions from their respective modules
-export * from './firebase/teams';
-export * from './firebase/projects';
-export * from './firebase/loops';
-export * from './firebase/spots';
-export * from './firebase/comments';
