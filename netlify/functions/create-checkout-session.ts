@@ -1,13 +1,11 @@
 import { Handler } from '@netlify/functions';
 import Stripe from 'stripe';
 
-// Initialize Stripe with the secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
 });
 
 export const handler: Handler = async (event) => {
-  // Only allow POST requests
   if (event.httpMethod !== 'POST') {
     return { 
       statusCode: 405, 
@@ -17,23 +15,17 @@ export const handler: Handler = async (event) => {
 
   try {
     const { planId, additionalTeamMembers = 0, userId } = JSON.parse(event.body || '{}');
+    const customerEmail = event.headers['x-customer-email'];
 
-    // Validate required parameters
-    if (!planId) {
+    if (!planId || !userId || !customerEmail) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Plan ID is required' })
+        body: JSON.stringify({ 
+          error: 'Missing required parameters' 
+        })
       };
     }
 
-    if (!userId) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'User ID is required' })
-      };
-    }
-
-    // Create line items array
     const lineItems = [
       {
         price: planId,
@@ -41,7 +33,6 @@ export const handler: Handler = async (event) => {
       }
     ];
 
-    // Add additional team members if any
     if (additionalTeamMembers > 0 && process.env.VITE_STRIPE_PRICE_ADDITIONAL_MEMBER) {
       lineItems.push({
         price: process.env.VITE_STRIPE_PRICE_ADDITIONAL_MEMBER,
@@ -49,13 +40,13 @@ export const handler: Handler = async (event) => {
       });
     }
 
-    // Create the checkout session
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: lineItems,
       success_url: `${process.env.URL || event.headers.origin}/dashboard?success=true`,
       cancel_url: `${process.env.URL || event.headers.origin}/plans?canceled=true`,
+      customer_email: customerEmail,
       metadata: {
         userId,
         planId,
@@ -63,7 +54,6 @@ export const handler: Handler = async (event) => {
       },
       allow_promotion_codes: true,
       billing_address_collection: 'required',
-      customer_email: event.headers['x-customer-email'],
     });
 
     return {

@@ -99,18 +99,6 @@ export const handler: Handler = async (event) => {
         }
         break;
       }
-
-      case 'customer.updated': {
-        const customer = stripeEvent.data.object as Stripe.Customer;
-        // Update customer details in Firebase if needed
-        break;
-      }
-
-      case 'payment_method.attached': {
-        const paymentMethod = stripeEvent.data.object as Stripe.PaymentMethod;
-        // Handle new payment method if needed
-        break;
-      }
     }
 
     return {
