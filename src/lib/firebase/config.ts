@@ -1,8 +1,16 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
+import { 
+  getFirestore, 
+  enableMultiTabIndexedDbPersistence,
+  enableIndexedDbPersistence,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager
+} from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
+// Get Firebase config from environment variable
 const firebaseConfig = JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG || '{}');
 
 if (!firebaseConfig.apiKey) {
@@ -12,18 +20,32 @@ if (!firebaseConfig.apiKey) {
 // Initialize Firebase app
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+
+// Initialize Firestore with persistence settings
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  }),
+  experimentalAutoDetectLongPolling: true
+});
+
 const storage = getStorage(app);
 
-// Enable Offline Persistence
+// Enable offline persistence based on environment
 if (import.meta.env.PROD) {
-  enableMultiTabIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
-    } else if (err.code === 'unimplemented') {
-      console.warn('The current browser does not support persistence.');
-    }
-  });
+  try {
+    // Try multi-tab persistence first
+    enableMultiTabIndexedDbPersistence(db).catch((err) => {
+      if (err.code === 'failed-precondition') {
+        // If multi-tab is not supported, fall back to single-tab persistence
+        return enableIndexedDbPersistence(db);
+      } else if (err.code === 'unimplemented') {
+        console.warn('Browser does not support IndexedDB persistence');
+      }
+    });
+  } catch (err) {
+    console.warn('Error enabling persistence:', err);
+  }
 }
 
-export { app, auth, db, storage };
+export { app, auth, db, storage, firebaseConfig };
