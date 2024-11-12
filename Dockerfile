@@ -25,7 +25,7 @@ COPY --from=builder /app/package*.json ./
 RUN npm install --omit=dev
 
 # Expose port
-EXPOSE 3000
+EXPOSE 3001
 
 # Start the application
 CMD ["npm", "run", "start"]
