@@ -1,8 +1,11 @@
-version: '3.8'
-
 services:
   app:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    image: loopcore-app:latest
+    container_name: loopcore-app
     ports:
       - "3000:3000"
     environment:
@@ -10,16 +13,23 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+    networks:
+      - loopcore-network
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
+    depends_on:
+      - functions
 
   functions:
     build: 
-      context: .
-      dockerfile: functions/Dockerfile
+      context: ./functions
+      dockerfile: Dockerfile
+      target: runner
+    image: loopcore-functions:latest
+    container_name: loopcore-functions
     ports:
       - "5001:5001"
     environment:
@@ -27,3 +37,10 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+    networks:
+      - loopcore-network
+
+networks:
+  loopcore-network:
+    name: loopcore-network
+    driver: bridge

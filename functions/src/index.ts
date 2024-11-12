@@ -1,15 +1,13 @@
 import express from 'express';
 import cors from 'cors';
-import * as admin from 'firebase-admin';
+import { Request, Response } from 'express';
 import Stripe from 'stripe';
+import * as admin from 'firebase-admin';
 
 // Initialize Firebase Admin
 admin.initializeApp({
-  credential: admin.credential.cert({
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-  })
+  credential: admin.credential.applicationDefault(),
+  projectId: process.env.FIREBASE_PROJECT_ID
 });
 
 // Initialize Stripe
@@ -21,26 +19,24 @@ const app = express();
 
 // Middleware
 app.use(cors());
-app.use(express.json({
-  verify: (req: any, res, buf) => {
-    req.rawBody = buf;
-  }
-}));
+app.use(express.json());
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok' });
 });
 
 // Create checkout session
-app.post('/create-checkout-session', async (req, res) => {
+app.post('/create-checkout-session', async (req: Request, res: Response): Promise<void> => {
+  const { planId, additionalTeamMembers = 0, userId, customerEmail } = req.body;
+
+  if (!planId || !userId || !customerEmail) {
+    res.status(400).json({ error: 'Missing required parameters' });
+    return;
+  }
+
   try {
-    const { planId, additionalTeamMembers = 0, userId, customerEmail } = req.body;
-
-    if (!planId || !userId || !customerEmail) {
-      return res.status(400).json({ error: 'Missing required parameters' });
-    }
-
+    // Create line items
     const lineItems = [
       {
         price: planId,
@@ -48,9 +44,9 @@ app.post('/create-checkout-session', async (req, res) => {
       }
     ];
 
-    if (additionalTeamMembers > 0 && process.env.VITE_STRIPE_PRICE_ADDITIONAL_MEMBER) {
+    if (additionalTeamMembers > 0 && process.env.STRIPE_PRICE_ADDITIONAL_MEMBER) {
       lineItems.push({
-        price: process.env.VITE_STRIPE_PRICE_ADDITIONAL_MEMBER,
+        price: process.env.STRIPE_PRICE_ADDITIONAL_MEMBER,
         quantity: additionalTeamMembers,
       });
     }
@@ -71,52 +67,124 @@ app.post('/create-checkout-session', async (req, res) => {
       billing_address_collection: 'required',
     });
 
-    res.json({
+    res.json({ 
       sessionId: session.id,
-      publishableKey: process.env.VITE_STRIPE_PUBLISHABLE_KEY
+      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY
     });
   } catch (err) {
     console.error('Error creating checkout session:', err);
-    res.status(500).json({
+    res.status(500).json({ 
       error: err instanceof Error ? err.message : 'Failed to create checkout session'
     });
   }
 });
 
-// Stripe webhook
-app.post('/webhook', async (req, res) => {
-  const sig = req.headers['stripe-signature'];
+// Cancel subscription
+app.post('/cancel-subscription', async (req: Request, res: Response): Promise<void> => {
+  const { userId } = req.body;
 
-  if (!sig) {
-    return res.status(400).send('No signature found');
+  if (!userId) {
+    res.status(400).json({ error: 'User ID is required' });
+    return;
   }
 
   try {
-    const event = stripe.webhooks.constructEvent(
-      req.rawBody,
+    const userDoc = await admin.firestore().collection('users').doc(userId).get();
+    const userData = userDoc.data();
+
+    if (!userData?.stripeSubscriptionId) {
+      res.status(404).json({ error: 'No active subscription found' });
+      return;
+    }
+
+    await stripe.subscriptions.update(userData.stripeSubscriptionId, {
+      cancel_at_period_end: true
+    });
+
+    await admin.firestore().collection('users').doc(userId).update({
+      'subscription.cancelAtPeriodEnd': true
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error canceling subscription:', err);
+    res.status(500).json({ 
+      error: err instanceof Error ? err.message : 'Failed to cancel subscription'
+    });
+  }
+});
+
+// Reactivate subscription
+app.post('/reactivate-subscription', async (req: Request, res: Response): Promise<void> => {
+  const { userId } = req.body;
+
+  if (!userId) {
+    res.status(400).json({ error: 'User ID is required' });
+    return;
+  }
+
+  try {
+    const userDoc = await admin.firestore().collection('users').doc(userId).get();
+    const userData = userDoc.data();
+
+    if (!userData?.stripeSubscriptionId) {
+      res.status(404).json({ error: 'No subscription found' });
+      return;
+    }
+
+    await stripe.subscriptions.update(userData.stripeSubscriptionId, {
+      cancel_at_period_end: false
+    });
+
+    await admin.firestore().collection('users').doc(userId).update({
+      'subscription.cancelAtPeriodEnd': false
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error reactivating subscription:', err);
+    res.status(500).json({ 
+      error: err instanceof Error ? err.message : 'Failed to reactivate subscription'
+    });
+  }
+});
+
+// Stripe webhook
+app.post('/webhook', express.raw({ type: 'application/json' }), async (req: Request, res: Response): Promise<void> => {
+  const sig = req.headers['stripe-signature'];
+
+  if (!sig) {
+    res.status(400).json({ error: 'No signature found' });
+    return;
+  }
+
+  try {
+    const stripeEvent = stripe.webhooks.constructEvent(
+      req.body,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
 
-    switch (event.type) {
+    switch (stripeEvent.type) {
       case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session;
+        const session = stripeEvent.data.object as Stripe.Checkout.Session;
         const { userId, planId, additionalTeamMembers } = session.metadata!;
 
         await admin.firestore().collection('users').doc(userId).update({
+          stripeCustomerId: session.customer,
+          stripeSubscriptionId: session.subscription,
           'subscription.planId': planId,
           'subscription.status': 'active',
           'subscription.currentPeriodEnd': new Date(session.expires_at! * 1000),
           'subscription.cancelAtPeriodEnd': false,
           'subscription.additionalTeamMembers': parseInt(additionalTeamMembers || '0', 10),
-          'subscription.stripeCustomerId': session.customer,
-          'subscription.stripeSubscriptionId': session.subscription,
         });
         break;
       }
 
+      case 'customer.subscription.created':
       case 'customer.subscription.updated': {
-        const subscription = event.data.object as Stripe.Subscription;
+        const subscription = stripeEvent.data.object as Stripe.Subscription;
         await admin.firestore().collection('users').doc(subscription.metadata.userId).update({
           'subscription.currentPeriodEnd': new Date(subscription.current_period_end * 1000),
           'subscription.status': subscription.status,
@@ -126,7 +194,7 @@ app.post('/webhook', async (req, res) => {
       }
 
       case 'customer.subscription.deleted': {
-        const subscription = event.data.object as Stripe.Subscription;
+        const subscription = stripeEvent.data.object as Stripe.Subscription;
         await admin.firestore().collection('users').doc(subscription.metadata.userId).update({
           'subscription.planId': 'free',
           'subscription.status': 'canceled',
@@ -138,7 +206,7 @@ app.post('/webhook', async (req, res) => {
       }
 
       case 'invoice.payment_succeeded': {
-        const invoice = event.data.object as Stripe.Invoice;
+        const invoice = stripeEvent.data.object as Stripe.Invoice;
         if (invoice.subscription) {
           const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
           await admin.firestore().collection('users').doc(subscription.metadata.userId).update({
@@ -150,7 +218,7 @@ app.post('/webhook', async (req, res) => {
       }
 
       case 'invoice.payment_failed': {
-        const invoice = event.data.object as Stripe.Invoice;
+        const invoice = stripeEvent.data.object as Stripe.Invoice;
         if (invoice.subscription) {
           const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
           await admin.firestore().collection('users').doc(subscription.metadata.userId).update({
@@ -164,77 +232,13 @@ app.post('/webhook', async (req, res) => {
     res.json({ received: true });
   } catch (err) {
     console.error('Stripe webhook error:', err);
-    res.status(400).send(`Webhook Error: ${err instanceof Error ? err.message : 'Unknown Error'}`);
-  }
-});
-
-// Cancel subscription
-app.post('/cancel-subscription', async (req, res) => {
-  try {
-    const { userId } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID is required' });
-    }
-
-    const userDoc = await admin.firestore().collection('users').doc(userId).get();
-    const userData = userDoc.data();
-
-    if (!userData?.subscription?.stripeSubscriptionId) {
-      throw new Error('No active subscription found');
-    }
-
-    await stripe.subscriptions.update(userData.subscription.stripeSubscriptionId, {
-      cancel_at_period_end: true
-    });
-
-    await userDoc.ref.update({
-      'subscription.cancelAtPeriodEnd': true
-    });
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Error canceling subscription:', err);
-    res.status(500).json({
-      error: err instanceof Error ? err.message : 'Failed to cancel subscription'
-    });
-  }
-});
-
-// Reactivate subscription
-app.post('/reactivate-subscription', async (req, res) => {
-  try {
-    const { userId } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID is required' });
-    }
-
-    const userDoc = await admin.firestore().collection('users').doc(userId).get();
-    const userData = userDoc.data();
-
-    if (!userData?.subscription?.stripeSubscriptionId) {
-      throw new Error('No subscription found');
-    }
-
-    await stripe.subscriptions.update(userData.subscription.stripeSubscriptionId, {
-      cancel_at_period_end: false
-    });
-
-    await userDoc.ref.update({
-      'subscription.cancelAtPeriodEnd': false
-    });
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Error reactivating subscription:', err);
-    res.status(500).json({
-      error: err instanceof Error ? err.message : 'Failed to reactivate subscription'
+    res.status(400).json({ 
+      error: err instanceof Error ? err.message : 'Unknown Error'
     });
   }
 });
 
 const port = process.env.PORT || 5001;
 app.listen(port, () => {
-  console.log(`Functions server running on port ${port}`);
+  console.log(`Server running on port ${port}`);
 });
