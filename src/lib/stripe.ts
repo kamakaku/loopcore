@@ -1,13 +1,15 @@
 import { loadStripe } from '@stripe/stripe-js';
+import { auth } from './firebase';
 
-// Überprüfen, ob der Stripe-Schlüssel vorhanden ist und loggen
-if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) {
-  throw new Error('Stripe Publishable Key is missing');
-}
-console.log('Stripe Publishable Key:', import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
-
-// Stripe mit dem veröffentlichten Schlüssel initialisieren
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+// Initialize Stripe with publishable key, with proper validation
+const stripePromise = (() => {
+  const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  if (!key) {
+    console.error('Stripe publishable key is missing');
+    return null;
+  }
+  return loadStripe(key);
+})();
 
 export const PLANS = {
   FREE: {
@@ -65,19 +67,25 @@ export const PLANS = {
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
 export async function createCheckoutSession(planId: string, additionalTeamMembers: number = 0) {
+  if (!auth.currentUser) {
+    throw new Error('Authentication required');
+  }
+
   if (!stripePromise) {
-    throw new Error('Stripe is not properly initialized');
+    throw new Error('Stripe is not properly initialized. Please check your API key configuration.');
   }
 
   try {
     const response = await fetch(`${API_URL}/create-checkout-session`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'x-customer-email': auth.currentUser.email || ''
       },
       body: JSON.stringify({
         planId,
-        additionalTeamMembers
+        additionalTeamMembers,
+        userId: auth.currentUser.uid
       })
     });
 
@@ -105,12 +113,19 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
 }
 
 export async function cancelSubscription() {
+  if (!auth.currentUser) {
+    throw new Error('Authentication required');
+  }
+
   try {
     const response = await fetch(`${API_URL}/cancel-subscription`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      body: JSON.stringify({
+        userId: auth.currentUser.uid
+      })
     });
 
     if (!response.ok) {
@@ -124,12 +139,19 @@ export async function cancelSubscription() {
 }
 
 export async function reactivateSubscription() {
+  if (!auth.currentUser) {
+    throw new Error('Authentication required');
+  }
+
   try {
     const response = await fetch(`${API_URL}/reactivate-subscription`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      body: JSON.stringify({
+        userId: auth.currentUser.uid
+      })
     });
 
     if (!response.ok) {
