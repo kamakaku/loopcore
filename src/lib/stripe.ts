@@ -1,13 +1,30 @@
 import { loadStripe } from '@stripe/stripe-js';
 import { auth } from './firebase';
 
+// Debug: Log environment variables (remove in production)
+console.log('Environment Variables Check:', {
+  hasStripeKey: !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY,
+  keyPrefix: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY?.substring(0, 7),
+});
+
 // Initialize Stripe with publishable key, with proper validation and error handling
 const stripePromise = (() => {
   const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  
   if (!key) {
-    console.error('Stripe publishable key is missing. Please check your .env file.');
+    console.error('Stripe publishable key is missing. Check these potential issues:\n' +
+      '1. .env file exists and is in the correct location\n' +
+      '2. Variable name is exactly VITE_STRIPE_PUBLISHABLE_KEY\n' +
+      '3. No spaces around the = sign in .env\n' +
+      '4. Server was restarted after .env changes');
     return null;
   }
+
+  if (!key.startsWith('pk_')) {
+    console.error('Invalid Stripe publishable key format. Key should start with "pk_"');
+    return null;
+  }
+
   try {
     return loadStripe(key);
   } catch (error) {
@@ -69,8 +86,6 @@ export const PLANS = {
   }
 } as const;
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
-
 export async function createCheckoutSession(planId: string, additionalTeamMembers: number = 0) {
   if (!auth.currentUser) {
     throw new Error('Authentication required');
@@ -81,7 +96,13 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
   }
 
   try {
-    const response = await fetch(`${API_URL}/create-checkout-session`, {
+    const stripe = await stripePromise;
+    
+    if (!stripe) {
+      throw new Error('Failed to initialize Stripe');
+    }
+
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/create-checkout-session`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -100,12 +121,6 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
     }
 
     const { sessionId } = await response.json();
-    const stripe = await stripePromise;
-    
-    if (!stripe) {
-      throw new Error('Failed to initialize Stripe');
-    }
-
     const { error } = await stripe.redirectToCheckout({ sessionId });
     
     if (error) {
@@ -123,7 +138,7 @@ export async function cancelSubscription() {
   }
 
   try {
-    const response = await fetch(`${API_URL}/cancel-subscription`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/cancel-subscription`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -149,7 +164,7 @@ export async function reactivateSubscription() {
   }
 
   try {
-    const response = await fetch(`${API_URL}/reactivate-subscription`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/reactivate-subscription`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
