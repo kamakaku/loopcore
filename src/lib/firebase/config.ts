@@ -9,26 +9,46 @@ import {
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
 
-// Initialize Firebase with config
-const firebaseConfig = JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG || '{}');
+// Create a singleton instance
+class FirebaseInstance {
+  private static instance: FirebaseInstance;
+  public app;
+  public auth;
+  public db;
+  public storage;
+  public functions;
 
-if (!firebaseConfig.apiKey) {
-  throw new Error('Firebase configuration is missing or invalid');
+  private constructor() {
+    const firebaseConfig = JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG || '{}');
+
+    if (!firebaseConfig.apiKey) {
+      throw new Error('Firebase configuration is missing or invalid');
+    }
+
+    this.app = initializeApp(firebaseConfig);
+    this.auth = getAuth(this.app);
+    this.db = initializeFirestore(this.app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      }),
+      experimentalAutoDetectLongPolling: true
+    });
+    this.storage = getStorage(this.app);
+    this.functions = getFunctions(this.app);
+  }
+
+  public static getInstance(): FirebaseInstance {
+    if (!FirebaseInstance.instance) {
+      FirebaseInstance.instance = new FirebaseInstance();
+    }
+    return FirebaseInstance.instance;
+  }
 }
 
-// Create the Firebase app instance first
-export const app = initializeApp(firebaseConfig);
+const firebase = FirebaseInstance.getInstance();
 
-// Then initialize all services using that app instance
-export const auth = getAuth(app);
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
-  }),
-  experimentalAutoDetectLongPolling: true
-});
-export const storage = getStorage(app);
-export const functions = getFunctions(app);
-
-// Export config if needed elsewhere
-export { firebaseConfig };
+export const app = firebase.app;
+export const auth = firebase.auth;
+export const db = firebase.db;
+export const storage = firebase.storage;
+export const functions = firebase.functions;
