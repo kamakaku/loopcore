@@ -1,12 +1,13 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { initializeApp } from '@firebase/app';
+import { getAuth } from '@firebase/auth';
 import { 
+  getFirestore,
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager
-} from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
-import { getFunctions } from 'firebase/functions';
+} from '@firebase/firestore';
+import { getStorage } from '@firebase/storage';
+import { getFunctions } from '@firebase/functions';
 
 // Get Firebase config from environment variable
 const firebaseConfig = JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG || '{}');
