@@ -1,38 +1,44 @@
-import * as functions from 'firebase-functions';
+import express from 'express';
+import cors from 'cors';
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
 
 // Initialize Firebase Admin
-admin.initializeApp();
+admin.initializeApp({
+  credential: admin.credential.cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+  })
+});
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16'
 });
 
-export const createCheckoutSession = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-      'unauthenticated',
-      'User must be authenticated'
-    );
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(express.json({
+  verify: (req: any, res, buf) => {
+    req.rawBody = buf;
   }
+}));
 
-  const { planId, additionalTeamMembers = 0 } = data;
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
 
-  if (!planId) {
-    throw new functions.https.HttpsError(
-      'invalid-argument',
-      'Plan ID is required'
-    );
-  }
-
+// Create checkout session
+app.post('/create-checkout-session', async (req, res) => {
   try {
-    const userDoc = await admin.firestore().collection('users').doc(context.auth.uid).get();
-    const userData = userDoc.data();
+    const { planId, additionalTeamMembers = 0, userId, customerEmail } = req.body;
 
-    if (!userData?.email) {
-      throw new Error('User email not found');
+    if (!planId || !userId || !customerEmail) {
+      return res.status(400).json({ error: 'Missing required parameters' });
     }
 
     const lineItems = [
@@ -55,9 +61,9 @@ export const createCheckoutSession = functions.https.onCall(async (data, context
       line_items: lineItems,
       success_url: `${process.env.PUBLIC_URL}/dashboard?success=true`,
       cancel_url: `${process.env.PUBLIC_URL}/plans?canceled=true`,
-      customer_email: userData.email,
+      customer_email: customerEmail,
       metadata: {
-        userId: context.auth.uid,
+        userId,
         planId,
         additionalTeamMembers: additionalTeamMembers.toString(),
       },
@@ -65,25 +71,24 @@ export const createCheckoutSession = functions.https.onCall(async (data, context
       billing_address_collection: 'required',
     });
 
-    return {
+    res.json({
       sessionId: session.id,
       publishableKey: process.env.VITE_STRIPE_PUBLISHABLE_KEY
-    };
+    });
   } catch (err) {
     console.error('Error creating checkout session:', err);
-    throw new functions.https.HttpsError(
-      'internal',
-      err instanceof Error ? err.message : 'Failed to create checkout session'
-    );
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to create checkout session'
+    });
   }
 });
 
-export const stripeWebhook = functions.https.onRequest(async (req, res) => {
+// Stripe webhook
+app.post('/webhook', async (req, res) => {
   const sig = req.headers['stripe-signature'];
 
   if (!sig) {
-    res.status(400).send('No signature found');
-    return;
+    return res.status(400).send('No signature found');
   }
 
   try {
@@ -163,16 +168,16 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
   }
 });
 
-export const cancelSubscription = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-      'unauthenticated',
-      'User must be authenticated'
-    );
-  }
-
+// Cancel subscription
+app.post('/cancel-subscription', async (req, res) => {
   try {
-    const userDoc = await admin.firestore().collection('users').doc(context.auth.uid).get();
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const userDoc = await admin.firestore().collection('users').doc(userId).get();
     const userData = userDoc.data();
 
     if (!userData?.subscription?.stripeSubscriptionId) {
@@ -187,26 +192,25 @@ export const cancelSubscription = functions.https.onCall(async (data, context) =
       'subscription.cancelAtPeriodEnd': true
     });
 
-    return { success: true };
+    res.json({ success: true });
   } catch (err) {
     console.error('Error canceling subscription:', err);
-    throw new functions.https.HttpsError(
-      'internal',
-      err instanceof Error ? err.message : 'Failed to cancel subscription'
-    );
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to cancel subscription'
+    });
   }
 });
 
-export const reactivateSubscription = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-      'unauthenticated',
-      'User must be authenticated'
-    );
-  }
-
+// Reactivate subscription
+app.post('/reactivate-subscription', async (req, res) => {
   try {
-    const userDoc = await admin.firestore().collection('users').doc(context.auth.uid).get();
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const userDoc = await admin.firestore().collection('users').doc(userId).get();
     const userData = userDoc.data();
 
     if (!userData?.subscription?.stripeSubscriptionId) {
@@ -221,12 +225,16 @@ export const reactivateSubscription = functions.https.onCall(async (data, contex
       'subscription.cancelAtPeriodEnd': false
     });
 
-    return { success: true };
+    res.json({ success: true });
   } catch (err) {
     console.error('Error reactivating subscription:', err);
-    throw new functions.https.HttpsError(
-      'internal',
-      err instanceof Error ? err.message : 'Failed to reactivate subscription'
-    );
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to reactivate subscription'
+    });
   }
+});
+
+const port = process.env.PORT || 5001;
+app.listen(port, () => {
+  console.log(`Functions server running on port ${port}`);
 });

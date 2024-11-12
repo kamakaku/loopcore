@@ -1,7 +1,5 @@
-import { loadStripe } from '@stripe/stripe-js';
-import { httpsCallable, HttpsCallableResult } from 'firebase/functions';
-import { functions } from './firebase';
 import { auth } from './firebase';
+import { loadStripe } from '@stripe/stripe-js';
 
 // Initialize Stripe with publishable key
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -59,10 +57,7 @@ export const PLANS = {
   }
 } as const;
 
-interface CheckoutSessionResponse {
-  sessionId: string;
-  publishableKey: string;
-}
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
 export async function createCheckoutSession(planId: string, additionalTeamMembers: number = 0) {
   if (!auth.currentUser) {
@@ -70,17 +65,25 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
   }
 
   try {
-    const createCheckoutSessionFn = httpsCallable<
-      { planId: string; additionalTeamMembers: number },
-      CheckoutSessionResponse
-    >(functions, 'createCheckoutSession');
-
-    const result = await createCheckoutSessionFn({
-      planId,
-      additionalTeamMembers
+    const response = await fetch(`${API_URL}/create-checkout-session`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        planId,
+        additionalTeamMembers,
+        userId: auth.currentUser.uid,
+        customerEmail: auth.currentUser.email
+      })
     });
 
-    const { sessionId, publishableKey } = result.data;
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create checkout session');
+    }
+
+    const { sessionId, publishableKey } = await response.json();
     
     const stripe = await loadStripe(publishableKey);
     if (!stripe) {
@@ -106,8 +109,20 @@ export async function cancelSubscription() {
   }
 
   try {
-    const cancelSubscriptionFn = httpsCallable(functions, 'cancelSubscription');
-    await cancelSubscriptionFn();
+    const response = await fetch(`${API_URL}/cancel-subscription`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        userId: auth.currentUser.uid
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to cancel subscription');
+    }
   } catch (error) {
     console.error('Error canceling subscription:', error);
     if (error instanceof Error) {
@@ -123,8 +138,20 @@ export async function reactivateSubscription() {
   }
 
   try {
-    const reactivateSubscriptionFn = httpsCallable(functions, 'reactivateSubscription');
-    await reactivateSubscriptionFn();
+    const response = await fetch(`${API_URL}/reactivate-subscription`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        userId: auth.currentUser.uid
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to reactivate subscription');
+    }
   } catch (error) {
     console.error('Error reactivating subscription:', error);
     if (error instanceof Error) {
