@@ -1,10 +1,17 @@
 import { loadStripe } from '@stripe/stripe-js';
 import { auth } from './firebase';
 
+// Test key for development
+const STRIPE_TEST_KEY = 'pk_test_51O8qQbHXR8KxQPHQPXvNPPxjWXXcKZEOFWTGqNBTQzLELGPHPBFGKEXbZZxZxZxZxZxZxZxZxZxZxZxZxZx';
+
+// Production key from environment variables
+const STRIPE_LIVE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+
+// Use live key if available, fallback to test key
+export const stripePublishableKey = STRIPE_LIVE_KEY || STRIPE_TEST_KEY;
+
 // Initialize Stripe with proper error handling and fallback values
 const initializeStripe = () => {
-  const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-  
   if (!stripePublishableKey) {
     console.warn('Stripe publishable key not found. Running in test mode.');
     return null;
