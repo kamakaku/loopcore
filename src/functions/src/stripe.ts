@@ -2,9 +2,13 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+// Hardcoded Stripe secret key
+const stripe = new Stripe('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', {
   apiVersion: '2023-10-16',
 });
+
+// Hardcoded additional member price ID
+const ADDITIONAL_MEMBER_PRICE = 'price_1QJvYcJ273McvJiH5f5lAhyY';
 
 export const createCheckoutSession = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
@@ -31,9 +35,9 @@ export const createCheckoutSession = functions.https.onCall(async (data, context
       }
     ];
 
-    if (additionalTeamMembers > 0 && process.env.VITE_STRIPE_PRICE_ADDITIONAL_MEMBER) {
+    if (additionalTeamMembers > 0) {
       lineItems.push({
-        price: process.env.VITE_STRIPE_PRICE_ADDITIONAL_MEMBER,
+        price: ADDITIONAL_MEMBER_PRICE,
         quantity: additionalTeamMembers,
       });
     }
@@ -42,8 +46,8 @@ export const createCheckoutSession = functions.https.onCall(async (data, context
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: lineItems,
-      success_url: `${process.env.PUBLIC_URL}/dashboard?success=true`,
-      cancel_url: `${process.env.PUBLIC_URL}/plans?canceled=true`,
+      success_url: 'https://go.loopcore.app/dashboard?success=true',
+      cancel_url: 'https://go.loopcore.app/plans?canceled=true',
       customer_email: email,
       metadata: {
         userId: context.auth.uid,

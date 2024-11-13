@@ -2,12 +2,16 @@ import { loadStripe } from '@stripe/stripe-js';
 import { httpsCallable } from 'firebase/functions';
 import { auth, functions } from './firebase';
 
-// Initialize Stripe
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+// Hardcoded Stripe publishable key
+const STRIPE_PUBLISHABLE_KEY = 'pk_live_51OPlIKJ273McvJiHuRro0Z8BJOUrwO9iPJJSuw2JTkH6ow2QS6S7ZjfR6syftnPCE4QAl6R9fsPRyqjGcRdDxnqV004GWB6wam';
 
+// Initialize Stripe
+const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
+
+// Hardcoded plan IDs
 export const PLANS = {
   FREE: {
-    id: import.meta.env.VITE_STRIPE_PRICE_FREE || 'price_free',
+    id: 'price_1QJvT0J273McvJiHfJGmDU1u',
     name: 'Free',
     price: 0,
     limits: {
@@ -19,7 +23,7 @@ export const PLANS = {
     }
   },
   BASIC: {
-    id: import.meta.env.VITE_STRIPE_PRICE_BASIC || 'price_basic',
+    id: 'price_1QJvTNJ273McvJiH5noToO96',
     name: 'Basic',
     price: 5,
     limits: {
@@ -31,7 +35,7 @@ export const PLANS = {
     }
   },
   PRO: {
-    id: import.meta.env.VITE_STRIPE_PRICE_PRO || 'price_pro',
+    id: 'price_1QJvToJ273McvJiH1B5VUteZ',
     name: 'Pro',
     price: 15,
     limits: {
@@ -44,7 +48,7 @@ export const PLANS = {
     }
   },
   TEAM: {
-    id: import.meta.env.VITE_STRIPE_PRICE_TEAM || 'price_team',
+    id: 'price_1QJvU3J273McvJiHJFONzwuz',
     name: 'Team',
     price: 25,
     limits: {
