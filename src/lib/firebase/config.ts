@@ -10,22 +10,15 @@ import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
 
 // Get Firebase config from environment variable
-let firebaseConfig;
-try {
-  firebaseConfig = {
-    apiKey: "AIzaSyCO4Fq8uTFFhL5lVDiTYIXzwjcS03D1fQE",
-    authDomain: "loopcore-3fc6f.firebaseapp.com",
-    projectId: "loopcore-3fc6f",
-    storageBucket: "loopcore-3fc6f.appspot.com",
-    messagingSenderId: "814296163933",
-    appId: "1:814296163933:web:a0ba05f033343f32d7cfb4",
-    measurementId: "G-J0NPPN8GGB"
-  };
-} catch (error) {
-  console.error('Error parsing Firebase config:', error);
-  throw new Error('Invalid Firebase configuration');
-}
-
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+};
 // Validate required config values
 if (!firebaseConfig?.apiKey || !firebaseConfig?.projectId) {
   throw new Error('Firebase configuration is missing required fields');
