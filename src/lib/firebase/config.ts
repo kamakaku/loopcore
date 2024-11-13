@@ -9,26 +9,18 @@ import {
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
 
-// Get Firebase config from environment variables
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: "AIzaSyCO4Fq8uTFFhL5lVDiTYIXzwjcS03D1fQE",
+  authDomain: "loopcore-3fc6f.firebaseapp.com",
+  projectId: "loopcore-3fc6f",
+  storageBucket: "loopcore-3fc6f.appspot.com",
+  messagingSenderId: "814296163933",
+  appId: "1:814296163933:web:a0ba05f033343f32d7cfb4",
+  measurementId: "G-J0NPPN8GGB"
 };
 
-console.log('Firebase Config:', firebaseConfig);
-
-// Validate required config values
-if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
-  console.error('Missing Firebase config values:', firebaseConfig);
-  throw new Error('Firebase configuration is missing required fields');
-}
-// Initialize Firebase (only once)
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
 
 // Initialize Auth
 const auth = getAuth(app);
