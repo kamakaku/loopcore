@@ -6,9 +6,26 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 export const handler: Handler = async (event) => {
+  // Set CORS headers
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, x-customer-email',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+
+  // Handle preflight requests
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 204,
+      headers,
+      body: ''
+    };
+  }
+
   if (event.httpMethod !== 'POST') {
     return { 
       statusCode: 405, 
+      headers,
       body: JSON.stringify({ error: 'Method Not Allowed' })
     };
   }
@@ -20,6 +37,7 @@ export const handler: Handler = async (event) => {
     if (!planId || !userId || !customerEmail) {
       return {
         statusCode: 400,
+        headers,
         body: JSON.stringify({ 
           error: 'Missing required parameters' 
         })
@@ -58,6 +76,7 @@ export const handler: Handler = async (event) => {
 
     return {
       statusCode: 200,
+      headers,
       body: JSON.stringify({ 
         sessionId: session.id,
         publishableKey: process.env.VITE_STRIPE_PUBLISHABLE_KEY
@@ -67,6 +86,7 @@ export const handler: Handler = async (event) => {
     console.error('Error creating checkout session:', err);
     return {
       statusCode: 500,
+      headers,
       body: JSON.stringify({ 
         error: err instanceof Error ? err.message : 'Failed to create checkout session'
       }),

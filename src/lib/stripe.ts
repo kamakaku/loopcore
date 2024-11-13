@@ -1,31 +1,9 @@
 import { loadStripe } from '@stripe/stripe-js';
-import { auth } from './firebase';
+import { httpsCallable } from 'firebase/functions';
+import { auth, functions } from './firebase';
 
-// Test key for development
-const STRIPE_TEST_KEY = 'pk_test_51O8qQbHXR8KxQPHQPXvNPPxjWXXcKZEOFWTGqNBTQzLELGPHPBFGKEXbZZxZxZxZxZxZxZxZxZxZxZxZxZx';
-
-// Production key from environment variables
-const STRIPE_LIVE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-
-// Use live key if available, fallback to test key
-export const stripePublishableKey = STRIPE_LIVE_KEY || STRIPE_TEST_KEY;
-
-// Initialize Stripe with proper error handling and fallback values
-const initializeStripe = () => {
-  if (!stripePublishableKey) {
-    console.warn('Stripe publishable key not found. Running in test mode.');
-    return null;
-  }
-
-  try {
-    return loadStripe(stripePublishableKey);
-  } catch (error) {
-    console.error('Failed to initialize Stripe:', error);
-    return null;
-  }
-};
-
-export const stripePromise = initializeStripe();
+// Initialize Stripe
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 export const PLANS = {
   FREE: {
@@ -85,34 +63,19 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
     throw new Error('Authentication required');
   }
 
-  if (!stripePromise) {
-    throw new Error('Stripe is not properly initialized');
-  }
-
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/create-checkout-session`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-customer-email': auth.currentUser.email || ''
-      },
-      body: JSON.stringify({
-        planId,
-        additionalTeamMembers,
-        userId: auth.currentUser.uid
-      })
+    const createCheckoutSessionFn = httpsCallable(functions, 'createCheckoutSession');
+    const { data } = await createCheckoutSessionFn({
+      planId,
+      additionalTeamMembers,
+      email: auth.currentUser.email
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create checkout session');
-    }
-
-    const { sessionId } = await response.json();
+    const { sessionId } = data as { sessionId: string };
     const stripe = await stripePromise;
     
     if (!stripe) {
-      throw new Error('Stripe failed to initialize');
+      throw new Error('Failed to initialize Stripe');
     }
 
     const { error } = await stripe.redirectToCheckout({ sessionId });
@@ -132,20 +95,8 @@ export async function cancelSubscription() {
   }
 
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/cancel-subscription`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        userId: auth.currentUser.uid
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to cancel subscription');
-    }
+    const cancelSubscriptionFn = httpsCallable(functions, 'cancelSubscription');
+    await cancelSubscriptionFn();
   } catch (error) {
     console.error('Error canceling subscription:', error);
     throw error;
@@ -158,20 +109,8 @@ export async function reactivateSubscription() {
   }
 
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/reactivate-subscription`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        userId: auth.currentUser.uid
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to reactivate subscription');
-    }
+    const reactivateSubscriptionFn = httpsCallable(functions, 'reactivateSubscription');
+    await reactivateSubscriptionFn();
   } catch (error) {
     console.error('Error reactivating subscription:', error);
     throw error;

@@ -1,47 +1,139 @@
 import * as functions from 'firebase-functions';
-import { stripe } from '../../lib/stripe';
+import * as admin from 'firebase-admin';
+import Stripe from 'stripe';
 
-export const stripeWebhook = functions.https.onRequest(async (req, res) => {
-  const sig = req.headers['stripe-signature'];
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2023-10-16',
+});
+
+export const createCheckoutSession = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      'unauthenticated',
+      'Authentication required'
+    );
+  }
+
+  const { planId, additionalTeamMembers = 0, email } = data;
+
+  if (!planId || !email) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Missing required parameters'
+    );
+  }
 
   try {
-    const event = stripe.webhooks.constructEvent(
-      req.rawBody,
-      sig,
-      webhookSecret
-    );
+    const lineItems = [
+      {
+        price: planId,
+        quantity: 1,
+      }
+    ];
 
-    switch (event.type) {
-      case 'checkout.session.completed':
-        const session = event.data.object;
-        await handleCheckoutComplete(session);
-        break;
-
-      case 'customer.subscription.updated':
-        const subscription = event.data.object;
-        await handleSubscriptionUpdate(subscription);
-        break;
+    if (additionalTeamMembers > 0 && process.env.VITE_STRIPE_PRICE_ADDITIONAL_MEMBER) {
+      lineItems.push({
+        price: process.env.VITE_STRIPE_PRICE_ADDITIONAL_MEMBER,
+        quantity: additionalTeamMembers,
+      });
     }
 
-    res.json({ received: true });
-  } catch (err) {
-    res.status(400).send(`Webhook Error: ${err.message}`);
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: lineItems,
+      success_url: `${process.env.PUBLIC_URL}/dashboard?success=true`,
+      cancel_url: `${process.env.PUBLIC_URL}/plans?canceled=true`,
+      customer_email: email,
+      metadata: {
+        userId: context.auth.uid,
+        planId,
+        additionalTeamMembers: additionalTeamMembers.toString(),
+      },
+      allow_promotion_codes: true,
+      billing_address_collection: 'required',
+    });
+
+    return { sessionId: session.id };
+  } catch (error) {
+    console.error('Error creating checkout session:', error);
+    throw new functions.https.HttpsError(
+      'internal',
+      'Failed to create checkout session'
+    );
   }
 });
 
-const handleCheckoutComplete = async (session: any) => {
-  const { customer, metadata } = session;
-  await updateUserSubscription(customer, {
-    planId: metadata.planId,
-    status: 'active',
-    subscriptionId: session.subscription
-  });
-};
+export const cancelSubscription = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      'unauthenticated',
+      'Authentication required'
+    );
+  }
 
-const handleSubscriptionUpdate = async (subscription: any) => {
-  await updateUserSubscription(subscription.customer, {
-    status: subscription.status,
-    currentPeriodEnd: new Date(subscription.current_period_end * 1000)
-  });
-};
+  try {
+    const userDoc = await admin.firestore().collection('users').doc(context.auth.uid).get();
+    const userData = userDoc.data();
+
+    if (!userData?.stripeSubscriptionId) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'No active subscription found'
+      );
+    }
+
+    await stripe.subscriptions.update(userData.stripeSubscriptionId, {
+      cancel_at_period_end: true
+    });
+
+    await userDoc.ref.update({
+      'subscription.cancelAtPeriodEnd': true
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error canceling subscription:', error);
+    throw new functions.https.HttpsError(
+      'internal',
+      'Failed to cancel subscription'
+    );
+  }
+});
+
+export const reactivateSubscription = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      'unauthenticated',
+      'Authentication required'
+    );
+  }
+
+  try {
+    const userDoc = await admin.firestore().collection('users').doc(context.auth.uid).get();
+    const userData = userDoc.data();
+
+    if (!userData?.stripeSubscriptionId) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'No subscription found'
+      );
+    }
+
+    await stripe.subscriptions.update(userData.stripeSubscriptionId, {
+      cancel_at_period_end: false
+    });
+
+    await userDoc.ref.update({
+      'subscription.cancelAtPeriodEnd': false
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error reactivating subscription:', error);
+    throw new functions.https.HttpsError(
+      'internal',
+      'Failed to reactivate subscription'
+    );
+  }
+});
