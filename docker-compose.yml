@@ -6,26 +6,22 @@ services:
       target: runner
     image: loopcore-app:latest
     container_name: loopcore-app
-    networks:
-      - coolify
+    ports:
+      - "3000:3000"
     environment:
       - NODE_ENV=production
     env_file:
       - .env
     restart: unless-stopped
+    networks:
+      - loopcore-network
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.loopcore.rule=Host(`go.loopcore.app`)
-      - traefik.http.routers.loopcore.entrypoints=http,https
-      - traefik.http.services.loopcore.loadbalancer.server.port=3000
-      - traefik.http.routers.loopcore.tls=true
-      - traefik.http.routers.loopcore.tls.certresolver=letsencrypt
-      - traefik.docker.network=coolify
+    depends_on:
+      - functions
 
   functions:
     build: 
@@ -34,22 +30,17 @@ services:
       target: runner
     image: loopcore-functions:latest
     container_name: loopcore-functions
-    networks:
-      - coolify
+    ports:
+      - "5001:5001"
     environment:
       - NODE_ENV=production
     env_file:
       - .env
     restart: unless-stopped
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.loopcore-api.rule=Host(`api.loopcore.app`)
-      - traefik.http.routers.loopcore-api.entrypoints=http,https
-      - traefik.http.services.loopcore-api.loadbalancer.server.port=5001
-      - traefik.http.routers.loopcore-api.tls=true
-      - traefik.http.routers.loopcore-api.tls.certresolver=letsencrypt
-      - traefik.docker.network=coolify
+    networks:
+      - loopcore-network
 
 networks:
-  coolify:
-    external: true
+  loopcore-network:
+    name: loopcore-network
+    driver: bridge
