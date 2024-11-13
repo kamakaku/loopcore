@@ -3,15 +3,15 @@ import { auth } from './firebase';
 
 // Initialize Stripe with proper error handling and fallback values
 const initializeStripe = () => {
-  const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
   
-  if (!key) {
+  if (!stripePublishableKey) {
     console.warn('Stripe publishable key not found. Running in test mode.');
     return null;
   }
 
   try {
-    return loadStripe(key);
+    return loadStripe(stripePublishableKey);
   } catch (error) {
     console.error('Failed to initialize Stripe:', error);
     return null;
