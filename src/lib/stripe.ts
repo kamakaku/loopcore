@@ -1,15 +1,17 @@
+// src/lib/stripe.ts
 import { loadStripe } from '@stripe/stripe-js';
 import { auth } from './firebase';
 
 // Debug: Log environment variables (remove in production)
 console.log('Environment Variables Check:', {
-  hasStripeKey: !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY,
-  keyPrefix: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY?.substring(0, 7)
+  hasStripeKey: !!process.env.VITE_STRIPE_PUBLISHABLE_KEY,
+  keyPrefix: process.env.VITE_STRIPE_PUBLISHABLE_KEY?.substring(0, 7),
+  apiUrl: process.env.VITE_API_URL
 });
 
 // Initialize Stripe with publishable key, with proper validation and error handling
 const stripePromise = (() => {
-  const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  const key = process.env.VITE_STRIPE_PUBLISHABLE_KEY;
   
   if (!key) {
     console.error('Stripe publishable key is missing. Check these potential issues:\n' +
@@ -34,7 +36,7 @@ const stripePromise = (() => {
 
 export const PLANS = {
   FREE: {
-    id: import.meta.env.VITE_STRIPE_PRICE_FREE,
+    id: process.env.VITE_STRIPE_PRICE_FREE,
     name: 'Free',
     price: 0,
     limits: {
@@ -46,7 +48,7 @@ export const PLANS = {
     }
   },
   BASIC: {
-    id: import.meta.env.VITE_STRIPE_PRICE_BASIC,
+    id: process.env.VITE_STRIPE_PRICE_BASIC,
     name: 'Basic',
     price: 5,
     limits: {
@@ -58,7 +60,7 @@ export const PLANS = {
     }
   },
   PRO: {
-    id: import.meta.env.VITE_STRIPE_PRICE_PRO,
+    id: process.env.VITE_STRIPE_PRICE_PRO,
     name: 'Pro',
     price: 15,
     limits: {
@@ -71,7 +73,7 @@ export const PLANS = {
     }
   },
   TEAM: {
-    id: import.meta.env.VITE_STRIPE_PRICE_TEAM,
+    id: process.env.VITE_STRIPE_PRICE_TEAM,
     name: 'Team',
     price: 25,
     limits: {
@@ -100,7 +102,7 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
       throw new Error('Failed to initialize Stripe');
     }
     
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/create-checkout-session`, {
+    const response = await fetch(`${process.env.VITE_API_URL}/create-checkout-session`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -136,7 +138,7 @@ export async function cancelSubscription() {
   }
 
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/cancel-subscription`, {
+    const response = await fetch(`${process.env.VITE_API_URL}/cancel-subscription`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -162,7 +164,7 @@ export async function reactivateSubscription() {
   }
 
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/reactivate-subscription`, {
+    const response = await fetch(`${process.env.VITE_API_URL}/reactivate-subscription`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
