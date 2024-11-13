@@ -1,107 +1,28 @@
-// src/lib/stripe.ts
 import { loadStripe } from '@stripe/stripe-js';
 import { auth } from './firebase';
 
-// Enhanced debugging
-const debugEnvVars = () => {
-  console.group('Stripe Environment Variables Debug');
-  try {
-    // Check if import.meta.env exists
-    console.log('import.meta.env exists:', !!import.meta.env);
-
-    // Log all VITE_ environment variables
-    const envVars = Object.entries(import.meta.env)
-      .filter(([key]) => key.startsWith('VITE_'))
-      .reduce((acc, [key, value]) => ({
-        ...acc,
-        [key]: value ? `${value.toString().substring(0, 4)}...` : value
-      }), {});
-    
-    console.log('All VITE_ environment variables:', envVars);
-
-    // Specific Stripe key checks
-    const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-    console.log('Stripe Key Details:', {
-      exists: !!stripeKey,
-      type: typeof stripeKey,
-      length: stripeKey?.length,
-      startsWithPk: stripeKey?.startsWith('pk_'),
-      firstChars: stripeKey ? `${stripeKey.substring(0, 4)}...` : 'none'
-    });
-
-    // Check other required Stripe variables
-    console.log('Required Stripe Variables:', {
-      PRICE_FREE: !!import.meta.env.VITE_STRIPE_PRICE_FREE,
-      PRICE_BASIC: !!import.meta.env.VITE_STRIPE_PRICE_BASIC,
-      PRICE_PRO: !!import.meta.env.VITE_STRIPE_PRICE_PRO,
-      PRICE_TEAM: !!import.meta.env.VITE_STRIPE_PRICE_TEAM,
-      API_URL: import.meta.env.VITE_API_URL
-    });
-  } catch (error) {
-    console.error('Error during environment variables debug:', error);
-  }
-  console.groupEnd();
-};
-
-// Run debug immediately
-debugEnvVars();
-
-// Initialize Stripe with enhanced error handling
-const stripePromise = (() => {
+// Initialize Stripe with proper error handling and fallback values
+const initializeStripe = () => {
   const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
   
   if (!key) {
-    console.error(`
-🔴 Stripe Configuration Error:
-----------------------------
-Missing publishable key. Please check:
-
-1. Environment Variables:
-   - Verify VITE_STRIPE_PUBLISHABLE_KEY is set
-   - Check for typos in variable name
-   - Ensure no spaces around = in .env
-
-2. Build Configuration:
-   - Confirm variable is marked as "Build Variable" in Coolify
-   - Verify variable is being injected during build
-
-3. Application State:
-   - Try clearing browser cache
-   - Rebuild and redeploy the application
-
-For debugging, run:
-  console.log(import.meta.env) in your browser console
-`);
-    return null;
-  }
-
-  if (!key.startsWith('pk_')) {
-    console.error(`
-🔴 Invalid Stripe Key Format:
---------------------------
-The provided key does not start with 'pk_'
-Received key format: ${key.substring(0, 4)}...
-Expected format: pk_test_xxx or pk_live_xxx
-`);
+    console.warn('Stripe publishable key not found. Running in test mode.');
     return null;
   }
 
   try {
     return loadStripe(key);
   } catch (error) {
-    console.error(`
-🔴 Stripe Initialization Error:
-----------------------------
-Failed to initialize Stripe client:
-${error instanceof Error ? error.message : 'Unknown error'}
-`);
+    console.error('Failed to initialize Stripe:', error);
     return null;
   }
-})();
+};
+
+export const stripePromise = initializeStripe();
 
 export const PLANS = {
   FREE: {
-    id: import.meta.env.VITE_STRIPE_PRICE_FREE,
+    id: import.meta.env.VITE_STRIPE_PRICE_FREE || 'price_free',
     name: 'Free',
     price: 0,
     limits: {
@@ -113,7 +34,7 @@ export const PLANS = {
     }
   },
   BASIC: {
-    id: import.meta.env.VITE_STRIPE_PRICE_BASIC,
+    id: import.meta.env.VITE_STRIPE_PRICE_BASIC || 'price_basic',
     name: 'Basic',
     price: 5,
     limits: {
@@ -125,7 +46,7 @@ export const PLANS = {
     }
   },
   PRO: {
-    id: import.meta.env.VITE_STRIPE_PRICE_PRO,
+    id: import.meta.env.VITE_STRIPE_PRICE_PRO || 'price_pro',
     name: 'Pro',
     price: 15,
     limits: {
@@ -138,7 +59,7 @@ export const PLANS = {
     }
   },
   TEAM: {
-    id: import.meta.env.VITE_STRIPE_PRICE_TEAM,
+    id: import.meta.env.VITE_STRIPE_PRICE_TEAM || 'price_team',
     name: 'Team',
     price: 25,
     limits: {
@@ -158,16 +79,11 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
   }
 
   if (!stripePromise) {
-    throw new Error('Stripe is not properly initialized. Please check your environment configuration.');
+    throw new Error('Stripe is not properly initialized');
   }
 
   try {
-    const stripe = await stripePromise;
-    if (!stripe) {
-      throw new Error('Failed to initialize Stripe');
-    }
-    
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/create-checkout-session`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/create-checkout-session`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -186,6 +102,12 @@ export async function createCheckoutSession(planId: string, additionalTeamMember
     }
 
     const { sessionId } = await response.json();
+    const stripe = await stripePromise;
+    
+    if (!stripe) {
+      throw new Error('Stripe failed to initialize');
+    }
+
     const { error } = await stripe.redirectToCheckout({ sessionId });
     
     if (error) {
@@ -203,7 +125,7 @@ export async function cancelSubscription() {
   }
 
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/cancel-subscription`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/cancel-subscription`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -229,7 +151,7 @@ export async function reactivateSubscription() {
   }
 
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/reactivate-subscription`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/reactivate-subscription`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
