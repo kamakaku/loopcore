@@ -19,7 +19,7 @@ export default function AppRouter() {
         path="/" 
         element={
           !user ? (
-            <Navigate to="/auth" replace />
+            <AuthScreen />
           ) : !user.subscription?.planId ? (
             <Navigate to="/plans" replace />
           ) : (
@@ -28,6 +28,7 @@ export default function AppRouter() {
         } 
       />
       
+      {/* Rest of your routes remain the same */}
       <Route 
         path="/auth" 
         element={
@@ -39,12 +40,11 @@ export default function AppRouter() {
         } 
       />
       
-      {/* Protected routes */}
       <Route 
         path="/plans" 
         element={
           !user ? (
-            <Navigate to="/auth" replace />
+            <Navigate to="/" replace />
           ) : user.subscription?.planId ? (
             <Navigate to="/dashboard" replace />
           ) : (
@@ -57,25 +57,11 @@ export default function AppRouter() {
         path="/dashboard/*" 
         element={
           !user ? (
-            <Navigate to="/auth" replace />
+            <Navigate to="/" replace />
           ) : !user.subscription?.planId ? (
             <Navigate to="/plans" replace />
           ) : (
             <Dashboard />
-          )
-        } 
-      />
-
-      {/* Catch all - redirect to auth if not logged in, or appropriate page if logged in */}
-      <Route 
-        path="*" 
-        element={
-          !user ? (
-            <Navigate to="/auth" replace />
-          ) : !user.subscription?.planId ? (
-            <Navigate to="/plans" replace />
-          ) : (
-            <Navigate to="/dashboard" replace />
           )
         } 
       />

@@ -1,24 +1,14 @@
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import LoginPage from './components/LoginPage';
-import PlansPage from './components/PlansPage';
+import AppRouter from './components/AppRouter';
 import './index.css';
-
-const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <LoginPage />
-  },
-  {
-    path: '/plans',
-    element: <PlansPage />
-  }
-]);
 
 export default function App() {
   return (
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRouter />
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
