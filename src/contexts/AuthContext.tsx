@@ -31,23 +31,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Subscribe to user document for subscription info
           const unsubscribeUser = onSnapshot(
             doc(db, 'users', firebaseUser.uid),
-            (doc) => {
-              setState({
-                user: {
-                  ...firebaseUser,
-                  subscription: doc.data()?.subscription
-                },
-                loading: false,
-                error: null
-              });
-            },
-            (error) => {
-              console.error('Error fetching user data:', error);
-              setState(prev => ({
-                ...prev,
-                error: error as Error,
-                loading: false
-              }));
+            {
+              next: (doc) => {
+                if (doc.exists()) {
+                  setState({
+                    user: {
+                      ...firebaseUser,
+                      subscription: doc.data()?.subscription || null
+                    },
+                    loading: false,
+                    error: null
+                  });
+                } else {
+                  // User document doesn't exist yet
+                  setState({
+                    user: {
+                      ...firebaseUser,
+                      subscription: null
+                    },
+                    loading: false,
+                    error: null
+                  });
+                }
+              },
+              error: (error) => {
+                console.error('Error fetching user data:', error);
+                setState(prev => ({
+                  ...prev,
+                  error: error as Error,
+                  loading: false
+                }));
+              }
             }
           );
 

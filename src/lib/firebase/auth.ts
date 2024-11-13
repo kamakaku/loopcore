@@ -29,14 +29,14 @@ export const signUp = async (email: string, password: string, name: string): Pro
     // Update profile
     updateProfile(userCredential.user, { displayName: name }),
     
-    // Create user document
+    // Create user document with initial subscription data
     setDoc(doc(db, 'users', userCredential.user.uid), {
       name,
       email,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       subscription: {
-        planId: 'free',
+        planId: 'FREE',
         status: 'active',
         currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         cancelAtPeriodEnd: false

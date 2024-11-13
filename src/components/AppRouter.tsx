@@ -20,20 +20,17 @@ export default function AppRouter() {
         element={
           !user ? (
             <AuthScreen />
-          ) : !user.subscription?.planId ? (
-            <Navigate to="/plans" replace />
           ) : (
             <Navigate to="/dashboard" replace />
           )
         } 
       />
       
-      {/* Rest of your routes remain the same */}
       <Route 
         path="/auth" 
         element={
           user ? (
-            <Navigate to={user.subscription?.planId ? '/dashboard' : '/plans'} replace />
+            <Navigate to="/dashboard" replace />
           ) : (
             <AuthScreen />
           )
@@ -44,9 +41,7 @@ export default function AppRouter() {
         path="/plans" 
         element={
           !user ? (
-            <Navigate to="/" replace />
-          ) : user.subscription?.planId ? (
-            <Navigate to="/dashboard" replace />
+            <Navigate to="/auth" replace />
           ) : (
             <PlanSelector />
           )
@@ -57,8 +52,8 @@ export default function AppRouter() {
         path="/dashboard/*" 
         element={
           !user ? (
-            <Navigate to="/" replace />
-          ) : !user.subscription?.planId ? (
+            <Navigate to="/auth" replace />
+          ) : !user.subscription ? (
             <Navigate to="/plans" replace />
           ) : (
             <Dashboard />
